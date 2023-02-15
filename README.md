@@ -1,6 +1,6 @@
 # SEACARTO
 Gravity model of maritime trade featuring narratives of antagonism\
-To run the model follow the steps:\
+To run the model follow the steps:<br/>
 1. Clone the git repository on your local machine\
 2. Download the following data:\
   2.1 CEPPI Gravity modelling dataset as csv and store it into the folder /data/gravity_model (http://www.cepii.fr/CEPII/en/bdd_modele/bdd_modele_item.asp?id=8)\
