@@ -360,7 +360,7 @@ def preproc_gm_data(ship_types: list, YEARS_HIST: np.array, output_path: str):
                     axis=1,
                 )
 
-    DATA.to_csv(os.path.join(output_path, "dataframe", "CEPII_preproc_new.csv"))
+    DATA.to_csv(os.path.join(output_path, "dataframe", "CEPII_preproc.csv"))
 
 
 def ssp_data(regressors_gm: str, output_path: str) -> None:
@@ -933,7 +933,7 @@ def main(
                         names_list.append("const" + ship + "_tw")
                     DATA = pd.read_csv(
                         os.path.join(
-                            output_path, "dataframe", "CEPII_preproc_withcoal.csv"
+                            output_path, "dataframe", "CEPII_preproc.csv"
                         ),
                         low_memory=False,
                         index_col=[0],

@@ -1,0 +1,608 @@
+---
+title: "SEACARTO"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+classoption: potraits
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+mypal  <- c("#E64B35B2", "#4DBBD5B2", "#00A087B2", "#3C5488B2","#F39B7FB2",
+             "#8491B4B2","#91D1C2B2","#DC0000B2","#7E6148B2","#B09C85B2","#B4D3B2")
+library(ggplot2)
+library(readxl)
+require(readxl)
+require(data.table)
+library(migest)
+require(ggpubr)
+library(waterfalls)
+library(plotly)
+library(ggpubr)
+library(circlize)
+library(ggalluvial)
+
+library(data.table)
+library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering visualization
+library(dendextend) # for comparing two dendrograms 
+library(fmsb) #for spider charts
+library(rmndt)
+library(tidyverse)
+library(tmap)
+library(MetBrewer)
+library(dplyr)
+library(ggsci)
+library(rnaturalearth)
+library(ggthemes)
+library(scales)
+library(sf)
+library(spData)
+library(fasterize)
+library(raster)
+library(tmaptools)
+library(biscale)
+library(ggthemes)
+library(viridis)
+library(hrbrthemes)
+library(scico)
+library(haven)
+library(ggnewscale)
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Prepare data from gravity model and calculate growth
+##specify folders
+#please insert here the path to you local folder
+########### IMPORTANT ###################
+local_folder= "ADD/YOUR/LOCAL/PATH/HERE"
+########### IMPORTANT ###################
+setwd(local_folder)
+data_folder = file.path(local_folder,"data")
+
+dat.in = fread(file.path(local_folder,"/outputs/bilateral_data_merged_rivalry.csv"), sep=",", header = T)
+dat.in[dat.in$export==0] <- NA
+dat.in <- na.omit(dat.in)
+#dat.in <-dat.in[dat.in$ssp != "3"]
+#dat.in <-dat.in[dat.in$ssp == "SSP3_100"  | dat.in$ssp == "SSP3_95"|  dat.in$ssp == "SSP3_92"]
+dat.in=dat.in[,c(4,5,6,117:244)]
+dat.in=melt(setDT(dat.in),id.vars = c("iso3_o", "iso3_d", "ssp", "cluster","o_d"))
+dat.in<-dat.in[!(dat.in$variable=="container_value"
+                 | dat.in$variable=="chemical_value"
+                 |dat.in$variable=="refrigerated cargo_value"
+                 |dat.in$variable=="ro-ro_value"
+                 |dat.in$variable=="oil_value"
+                 |dat.in$variable=="bulk dry_value"
+                 |dat.in$variable=="liquified gas_value")]
+dat.in<-transform(dat.in,year=str_sub(dat.in$variable, - 4, - 1) )
+#dat.in<-transform(dat.in,world_scenario=str_sub(dat.in$ssp,  - 2, - 1) )
+#dat.in<-transform(dat.in,ssp=str_sub(dat.in$ssp,  end= - 4) )
+dat.in$year = as.numeric(as.character(dat.in$year))
+dat.in<-transform(dat.in,variable=str_sub(dat.in$variable, end = -5) )
+dat.in_saved_2 <-dat.in
+region_mapping = fread(file.path(data_folder,"/plotting/regimes_clustering_2.csv"), sep=";", header = T)
+region_mapping <- filter(region_mapping,year == "2020")
+region_mapping= region_mapping[,c(1,4)]
+setnames(region_mapping, old = "country_text_id", new = "iso3_d")
+dat.in<- merge(dat.in,region_mapping, by = c("iso3_d"),all.x = TRUE)
+setnames(dat.in, old = "regime", new = "destination_regime")
+region_mapping = fread(file.path(data_folder,"/plotting/regimes_clustering_2.csv"), sep=";", header = T)
+region_mapping <- filter(region_mapping,year == "2020")
+region_mapping= region_mapping[,c(1,4)]
+setnames(region_mapping, old = "country_text_id", new = "iso3_o")
+dat.in<- merge(dat.in,region_mapping, by = c("iso3_o"),all.x = TRUE)
+setnames(dat.in, old = "regime", new = "origin_regime")
+#get the growth
+helper_df<-dat.in
+helper_df <- filter(helper_df, ssp == "1")
+setDT(helper_df)[, baseline_adj:= ifelse(ssp != '1', value[ssp == '1'],value),by =c("iso3_o","iso3_d", "destination_regime","origin_regime", "variable","o_d", "cluster","year")]
+helper_df<-helper_df[,c("iso3_o","iso3_d", "destination_regime","origin_regime", "variable","o_d", "cluster","baseline_adj","year")]
+dat.in = merge(x = dat.in, y = helper_df, by.x = c("iso3_o","iso3_d", "destination_regime","origin_regime", "variable","o_d", "cluster","year"), by.y =  c("iso3_o","iso3_d", "destination_regime","origin_regime", "variable","o_d", "cluster","year"), all.x=TRUE,allow.cartesian=TRUE, no.dups = F)
+setDT(dat.in)[, baseline:= ifelse(year!= 2015, baseline_adj[year == 2015],baseline_adj),by =c("iso3_o","iso3_d", "destination_regime","origin_regime", "variable","o_d", "cluster","ssp")]
+setDT(dat.in)[, Growth:= value/baseline,by =c("iso3_o","iso3_d", "destination_regime","origin_regime", "variable","o_d", "cluster", "ssp","year")]
+#add the baseline
+baseline_data = fread(file.path(local_folder,"/ouputs/CEPII_preproc.csv"), sep=",", header = T)
+baseline_data <- filter(baseline_data,year == 2018)
+baseline_data <-baseline_data[,c(3,4,88,90,92,94,96,98,100)]
+baseline_data=melt(baseline_data,id.vars = c("iso3_o","iso3_d"))
+
+#calculate trade
+dat.in<-dat.in[,c(1:9,13)]
+setnames(baseline_data, old = "value", new = "baseline")
+dat.in<- merge(dat.in,baseline_data, by = c("iso3_d","iso3_o", "variable"),all.x = TRUE)
+setDT(dat.in)[, value_adj:= baseline*Growth,by =c("iso3_o","iso3_d", "destination_regime","origin_regime", "variable","o_d", "cluster", "ssp","year")]
+dat.in<-dat.in[,c(1:9,12)]
+setnames(dat.in, old = "value_adj", new = "value")
+write.csv(dat.in,data_folder,"/plotting/dat.in_saved.csv", row.names = FALSE)
+dat.in = fread(file.path(data_folder,"/plotting/dat.in_saved.csv"), sep=",", header = T)
+```
+
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Figure 3A
+dat.in <- na.omit(dat.in)
+dat.in_working <- dat.in
+dat.in_working$value <- as.numeric(dat.in_working$value) 
+dat.in_working <- dat.in_working %>% group_by(ssp,year,variable,destination_regime,origin_regime,cluster)
+dat.in_working = summarise(dat.in_working, global_value = sum(value))
+dat.in_working <- filter(dat.in_working, cluster == "1"|cluster == "2"|cluster == "3"|cluster == "4")
+dat.in_working <- filter(dat.in_working, year == "2020")
+dat.in_working <- filter(dat.in_working, ssp == "1")
+dat.in_working$global_value <- as.numeric(dat.in_working$global_value) 
+helper_df<-dat.in_working[,c("ssp","destination_regime","variable","global_value")]
+helper_df<- helper_df %>% group_by(ssp,destination_regime,variable)
+helper_df = summarise(helper_df, cum_value = sum(global_value))
+dat.in_working = merge(x = dat.in_working, y = helper_df, by.x = c("destination_regime","variable","ssp"), by.y =  c("destination_regime","variable","ssp"), all.x=TRUE, no.dups = F)
+setDT(dat.in_working)[, share_total:= global_value/cum_value,by =c("variable","destination_regime","origin_regime","ssp")]
+dat.in_working <- filter(dat.in_working, variable != "trade_refrigerated cargo_value")
+dependency<-ggplot() + 
+    geom_tile(dat.in_working, mapping=aes(destination_regime, origin_regime, fill=share_total),color="black", size=0.5)+
+     #scale_fill_manual(pal = "-RdYlBu") +
+   scale_fill_distiller(palette = "RdYlBu")+
+  labs(
+    title = "",
+    subtitle = " "
+  ) +
+  geom_text(dat.in_working,mapping=aes(destination_regime, origin_regime, label=scales::percent(round(share_total, digits = 2), accurancy =0.01)))+
+  facet_wrap(~variable)+
+  theme_minimal()+
+  #theme(legend.position="none")+
+    xlab("destination regime")+
+  ylab("origin regime")+
+    theme(axis.text = element_text(face="bold"))+
+  theme(axis.text=element_text(size=15))+
+      theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust=1))
+print(dependency)
+ggsave(filename = "total_dependency_and_elasticity.png",width = 10, height = 7, dpi = 500)
+
+
+
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Figure 4A and 4B
+dat.in_working <- na.omit(dat.in)
+dat.in_working <- filter(dat.in_working, cluster == "1"|cluster == "2"|cluster == "3"|cluster == "4")
+dat.in_working <-dat.in_working[,c(1,2,3,8:10)] 
+dat.in_working$value <- as.numeric(dat.in_working$value) 
+
+dat.in_working <- filter(dat.in_working, variable != "trade_refrigerated cargo_value")
+#calculate adjusted trade
+helper_df <- dat.in_working %>% group_by(ssp,year,iso3_d, variable)
+helper_df = summarise(helper_df, total_value_destination = sum(value))
+dat.in_working = merge(x = dat.in_working, y = helper_df, by.x = c("ssp","year","iso3_d","variable"), by.y =  c("ssp","year","iso3_d","variable"), all.x=TRUE, no.dups = F)
+setDT(dat.in_working)[, baseline:= ifelse(ssp != '1', value[ssp == '1'],value),by =c("iso3_o","iso3_d","variable","year")]
+helper_df <- dat.in_working %>% group_by(ssp,year,iso3_d, variable)
+helper_df = summarise(helper_df, baseline_destination = sum(baseline))
+dat.in_working = merge(x = dat.in_working, y = helper_df, by.x = c("ssp","year","iso3_d","variable"), by.y =  c("ssp","year","iso3_d","variable"), all.x=TRUE, no.dups = F)
+setDT(dat.in_working)[, adjusting_factor:= total_value_destination/baseline_destination,by =c("ssp","iso3_d", "year","iso3_o")]
+setDT(dat.in_working)[, updated_trade:= value/adjusting_factor,by =c("ssp","iso3_d", "year","iso3_o")]
+dat.in_working$value <- as.numeric(dat.in_working$value)
+dat.in_working<-dat.in_working[,c(1:5,11)]
+#add regime mapping
+region_mapping = fread(file.path(data_folder,"/plotting/regimes_clustering_2.csv"), sep=";", header = T)
+region_mapping <- filter(region_mapping,year == "2020")
+region_mapping= region_mapping[,c(1,4)]
+setnames(region_mapping, old = "country_text_id", new = "iso3_d")
+dat.in_working<- merge(dat.in_working,region_mapping, by = c("iso3_d"),all.x = TRUE)
+setnames(dat.in_working, old = "regime", new = "destination_regime")
+region_mapping = fread(file.path(data_folder,"/plotting/regimes_clustering_2.csv"), sep=";", header = T)
+region_mapping <- filter(region_mapping,year == "2020")
+region_mapping= region_mapping[,c(1,4)]
+setnames(region_mapping, old = "country_text_id", new = "iso3_o")
+dat.in_working<- merge(dat.in_working,region_mapping, by = c("iso3_o"),all.x = TRUE)
+setnames(dat.in_working, old = "regime", new = "origin_regime")
+dat.in_working <-dat.in_working[,c(3:8)] 
+dat.in_working <- dat.in_working %>% group_by(ssp,year,origin_regime,destination_regime, variable)
+dat.in_working = summarise(dat.in_working, global_value = sum(updated_trade))
+helper_df <- dat.in_working %>% group_by(ssp,year,destination_regime, variable)
+helper_df = summarise(helper_df, total_value = sum(global_value))
+dat.in_working = merge(x = dat.in_working, y = helper_df, by.x = c("ssp","year","destination_regime","variable"), by.y =  c("ssp","year","destination_regime","variable"), all.x=TRUE, no.dups = F)
+setDT(dat.in_working)[, share:= global_value/total_value,by =c("ssp","destination_regime", "year","origin_regime")]
+dat.in_working$global_value <- as.numeric(dat.in_working$global_value)
+setDT(dat.in_working)[, baseline:= share[year == "2015"],by =c("ssp","origin_regime","destination_regime","variable")]
+setDT(dat.in_working)[, Growth:= share/baseline,by =c("ssp","origin_regime","destination_regime","variable")]
+dat.in_working$dat.in_working <- as.character(dat.in_working$dat.in_working)
+dat.in_working<- dat.in_working %>% group_by(year,variable,destination_regime,origin_regime) %>% mutate(min=min(share), max=max(share))
+dat.in_working<-setDT(dat.in_working)[, democracy := ifelse(origin_regime ==  "Democracy", TRUE, FALSE)]
+dat.in_working <- filter(dat.in_working, destination_regime == "Autocracy")
+mid<-mean(dat.in_working$Growth)
+dat.in_working <- filter(dat.in_working, ssp == "1"|ssp == "25"|ssp == "50"|ssp == "75"
+                         |ssp == "100"|ssp == "125"|ssp == "150"|ssp == "175"|ssp == "200")
+dat.in_working <- filter(dat.in_working, year >= 2020)
+dat.in_working<- dat.in_working %>% group_by(year,variable,destination_regime) %>% mutate(min=min(share), max=max(share))
+dat.in_working<-setDT(dat.in_working)[, baseline := ifelse(ssp ==  "1", TRUE, FALSE)]
+dat.in_working <-filter(dat.in_working, year <= 2050)
+test<-ggplot(data=dat.in_working, aes(x=year, y=share,group=ssp)) +
+  geom_line(data = filter(dat.in_working, democracy),aes(x=year, y=share, col = ssp,color= democracy),linetype="dashed",size=1.1)+
+  scale_color_gradientn(colours = colorspace::diverging_hcl(10))+
+  geom_line(data = filter(dat.in_working, !democracy),aes(x=year, y=share, col = ssp, color= democracy),size=1.1)+
+   ggnewscale::new_scale_color() +
+  scale_color_gradientn(colours = colorspace::diverging_hcl(10))+
+  facet_grid(~variable)+
+  theme_few()+
+   theme(panel.spacing = unit(0.35, "cm"))
+print(test)
+
+
+ggsave(filename = "Autocracy.png",width = 15, height = 7, dpi = 500)
+
+
+
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Figure 5B anc 5C
+dat.in_working <- na.omit(dat.in)
+dat.in_working <- filter(dat.in_working, cluster == "1"|cluster == "2"|cluster == "3"|cluster == "4")
+dat.in_working <-dat.in_working[,c(1,2,3,8:10)] 
+dat.in_working$value <- as.numeric(dat.in_working$value) 
+dat.in_working <- filter(dat.in_working, variable != "trade_refrigerated cargo_value")
+helper_df <- dat.in_working %>% group_by(ssp,year,iso3_d, variable)
+helper_df = summarise(helper_df, total_value_destination = sum(value))
+dat.in_working = merge(x = dat.in_working, y = helper_df, by.x = c("ssp","year","iso3_d","variable"), by.y =  c("ssp","year","iso3_d","variable"), all.x=TRUE, no.dups = F)
+setDT(dat.in_working)[, baseline:= ifelse(ssp != '1', value[ssp == '1'],value),by =c("iso3_o","iso3_d","variable","year")]
+helper_df <- dat.in_working %>% group_by(ssp,year,iso3_d, variable)
+helper_df = summarise(helper_df, baseline_destination = sum(baseline))
+dat.in_working = merge(x = dat.in_working, y = helper_df, by.x = c("ssp","year","iso3_d","variable"), by.y =  c("ssp","year","iso3_d","variable"), all.x=TRUE, no.dups = F)
+setDT(dat.in_working)[, adjusting_factor:= total_value_destination/baseline_destination,by =c("ssp","iso3_d", "year","iso3_o")]
+setDT(dat.in_working)[, updated_trade:= value/adjusting_factor,by =c("ssp","iso3_d", "year","iso3_o")]
+dat.in_working$value <- as.numeric(dat.in_working$value)
+dat.in_working<-dat.in_working[,c(1:5,11)]
+region_mapping = fread(file.path(data_folder,"/plotting/regimes_clustering_2.csv"), sep=";", header = T)
+region_mapping <- filter(region_mapping,year == "2020")
+region_mapping= region_mapping[,c(1,4)]
+setnames(region_mapping, old = "country_text_id", new = "iso3_d")
+dat.in_working<- merge(dat.in_working,region_mapping, by = c("iso3_d"),all.x = TRUE)
+setnames(dat.in_working, old = "regime", new = "destination_regime")
+region_mapping = fread(file.path(data_folder,"/plotting/regimes_clustering_2.csv"), sep=";", header = T)
+region_mapping <- filter(region_mapping,year == "2020")
+region_mapping= region_mapping[,c(1,4)]
+setnames(region_mapping, old = "country_text_id", new = "iso3_o")
+dat.in_working<- merge(dat.in_working,region_mapping, by = c("iso3_o"),all.x = TRUE)
+setnames(dat.in_working, old = "regime", new = "origin_regime")
+dat.in_working <-dat.in_working[,c(3:8)] 
+dat.in_working <- dat.in_working %>% group_by(ssp,year,origin_regime,destination_regime, variable)
+dat.in_working = summarise(dat.in_working, global_value = sum(updated_trade))
+
+
+
+energy_data = fread(file.path(data_folder,"/plotting/energy_data_region.csv"), sep=",", header = T)
+#get only data we need
+iso_adj = fread(file.path(data_folder,"/plotting/iso_we_need.csv"), sep=",", header = T)
+energy_data<- merge(iso_adj,energy_data, by = c("iso3_o"),all.x = TRUE)
+region_mapping = fread(file.path(data_folder,"/plotting/regimes_clustering_2.csv"), sep=";", header = T)
+region_mapping <- filter(region_mapping,year == "2020")
+region_mapping= region_mapping[,c(1,4)]
+setnames(region_mapping, old = "country_text_id", new = "iso3_d")
+energy_data<- merge(energy_data,region_mapping, by = c("iso3_d"),all.x = TRUE)
+setnames(energy_data, old = "regime", new = "destination_regime")
+region_mapping = fread(file.path(data_folder,"/plotting/regimes_clustering_2.csv"), sep=";", header = T)
+region_mapping <- filter(region_mapping,year == "2020")
+region_mapping= region_mapping[,c(1,4)]
+setnames(region_mapping, old = "country_text_id", new = "iso3_o")
+energy_data<- merge(energy_data,region_mapping, by = c("iso3_o"),all.x = TRUE)
+setnames(energy_data, old = "regime", new = "origin_regime")
+energy_data<-na.omit(energy_data)
+energy_data<- energy_data[,c(3,4,5,6)]
+energy_data <- energy_data %>% group_by(origin_regime,destination_regime,variable)
+energy_data = summarise(energy_data, regional_energy = sum(energy_mj))
+dat.in_working <- filter(dat.in_working, variable != "trade_refrigerated cargo_value")
+dat.in_working<- merge(dat.in_working,energy_data, by = c("origin_regime","destination_regime","variable"),all.x = TRUE)
+dat.in_working <- filter(dat.in_working, variable != "trade_refrigerated cargo_value")
+helper_df <- na.omit(dat.in_working)
+helper_df <- filter(helper_df, ssp == "1")
+setDT(helper_df)[, baseline:= ifelse(year != '2015', global_value[year == '2015'],global_value),by =c("ssp","origin_regime", "variable","destination_regime")]
+helper_df<-helper_df[,c("year","ssp","origin_regime", "variable","destination_regime","baseline")]
+dat.in_working = merge(x = dat.in_working, y = helper_df, by.x = c("year","origin_regime", "variable","destination_regime"), by.y =  c("year","origin_regime", "variable","destination_regime"), all.x=TRUE, no.dups = F)
+dat.in_working<-dat.in_working[,c(1:7,9)]
+setnames(dat.in_working, old = "ssp.x", new = "ssp")
+setDT(dat.in_working)[, Growth:= global_value/baseline,by =c("ssp","origin_regime", "variable","destination_regime")]
+setDT(dat.in_working)[, energy:= Growth*regional_energy,by =c("ssp","origin_regime", "variable","destination_regime")]
+setDT(dat.in_working)[, o_d:= paste(origin_regime,destination_regime,sep=""),by =c("ssp","variable")]
+dat.in_working <-dat.in_working[,c(1,2,3,4,5,10,11)] 
+setDT(dat.in_working)[, cluster:= 1,by =c("ssp","variable")]
+dat.in_working<-setDT(dat.in_working)[, cluster := ifelse(o_d ==  "AutocracyAutocracy", 4, cluster)]
+dat.in_working<-setDT(dat.in_working)[, cluster := ifelse(o_d ==  "AutocracyDemocracy", 3, cluster)]
+dat.in_working<-setDT(dat.in_working)[, cluster := ifelse(o_d ==  "DemocracyAutocracy", 2, cluster)]
+dat.in_working<-setDT(dat.in_working)[, cluster := ifelse(o_d ==  "DemocracyDemocracy", 1, cluster)]
+dat.in_working <- dat.in_working %>% group_by(ssp,year,variable,cluster)
+dat.in_working = summarise(dat.in_working, global_energy = sum(energy))
+dat.in_working <- filter(dat.in_working, ssp == "1"|ssp == "25"|ssp == "50"|ssp == "75"
+                         |ssp == "100"|ssp == "125"|ssp == "150"|ssp == "175"|ssp == "200"|ssp == "500")
+
+
+test<-ggplot(data=dat.in_working, aes(x=year, y=global_energy,col=variable)) +
+geom_line()+
+facet_grid(~ssp)+
+  theme_few()+
+  scale_fill_manual(values = mypal)
+print(test)
+ggsave(filename = "total_energy.png",width = 15, height = 7, dpi = 500)
+#calculate difference
+helper_df <-  copy(dat.in_working)
+helper_df <-filter(helper_df, ssp == "1")
+setnames(helper_df, old = "global_energy", new = "baseline")
+helper_df <- helper_df[,c(2,3,4,5)]
+dat.in_working_adj = merge(x = dat.in_working, y = helper_df, by.x = c("year","variable","cluster"), by.y =  c("year","variable","cluster"), all.x=TRUE, no.dups = F)
+setDT(dat.in_working_adj)[, difference:= global_energy-baseline,by =c("ssp" ,"variable","cluster")]
+setDT(dat.in_working_adj)[, share:= difference/baseline,by =c("ssp" ,"variable","cluster")]
+
+dat.in_working_adj <-filter(dat.in_working_adj, ssp == "100")
+test<-ggplot(data=dat.in_working_adj, aes(x=year, y=share,col=variable)) +
+geom_line()+
+facet_grid(~cluster)+
+  theme_few()+
+  scale_fill_manual(values = mypal)
+print(test)
+#total difference 
+dat.in_working <- dat.in_working %>% group_by(ssp,year,variable)
+dat.in_working = summarise(dat.in_working, global_energy = sum(global_energy))
+helper_df <-  copy(dat.in_working)
+helper_df <-filter(helper_df, ssp == "1")
+setnames(helper_df, old = "global_energy", new = "baseline")
+helper_df <- helper_df[,c(2,3,4)]
+dat.in_working_adj2 = merge(x = dat.in_working, y = helper_df, by.x = c("year","variable"), by.y =  c("year","variable"), all.x=TRUE, no.dups = F)
+setDT(dat.in_working_adj2)[, difference:= global_energy-baseline,by =c("ssp" ,"variable")]
+setDT(dat.in_working_adj2)[, share:= difference/baseline,by =c("ssp" ,"variable")]
+dat.in_working_adj2 <-filter(dat.in_working_adj2, ssp == "1"|ssp == "200")
+dat.in_working_adj2_adj<-filter(dat.in_working_adj2, ssp == "200")
+dat.in_working_adj2_adj <-filter(dat.in_working_adj2_adj, year <= 2050)
+test<-ggplot(data=dat.in_working_adj2_adj, aes(x=year, y=share,fill=variable)) +
+geom_area()+
+facet_grid(~variable)+
+  theme_few()+
+  scale_fill_manual(values = mypal)
+print(test)
+ggsave(filename = "100_shares_energy.png",width = 15, height = 7, dpi = 500)
+dat.in_working_adj2 <-filter(dat.in_working_adj2, year <= 2050)
+test<-ggplot(data=dat.in_working_adj2, aes(x=year, y=global_energy,fill=variable)) +
+geom_area()+
+facet_grid(~ssp)+
+  theme_few()+
+  scale_fill_manual(values = mypal)
+print(test)
+ggsave(filename = "total Energy.png",width = 15, height = 7, dpi = 500)
+
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Supplementary information Figure 1
+gdp = fread(file.path(data_folder,"/plotting/gdp_future.csv"), sep=";", header = T)
+gdp=melt(gdp,id.vars = c("Region","Scenario"))
+setnames(gdp, old = "variable", new = "year")
+setnames(gdp, old = "value", new = "gdp_million")
+gdp<-transform(gdp,gdp_million=gdp_million*1000)
+pop = fread(file.path(data_folder,"/plotting/pop_future.csv"), sep=";", header = T)
+pop=melt(pop,id.vars = c("Region","Scenario"))
+setnames(pop, old = "variable", new = "year")
+setnames(pop, old = "value", new = "pop_million")
+gdp_pop = merge(x = gdp, y = pop, by.x = c("Region","year","Scenario"), by.y =  c("Region","year","Scenario"), all.x=TRUE, no.dups = F)
+gdp_pop<-transform(gdp_pop,gdp_cap=(gdp_million/pop_million)*1000)
+gdp_pop=melt(gdp_pop,id.vars = c("Region","year","Scenario"))
+gdp_pop<-na.omit(gdp_pop)
+gdp_pop$year = as.numeric(as.character(gdp_pop$year))
+gdp_pop<-approx_dt(dt =setDT(gdp_pop), ## database to interpolate
+                        xdata = seq(2010,2100,1), ## time steps on which to interpolate
+                        ycol = "value", ## column containing the data to interpolate
+                        xcol="year", ## x-axis of the interpolation, i.e. the years that you indeed have available
+                        idxcols=c("Region", "variable", "Scenario"), ## equivalent of "group_by" in dplyr and "by=.(....)" in data.table
+                        extrapolate = T) ## extrapolate? i.e. min(xdata)<min(unique(dat$year))|max(xdata)>max(unique(dat$year))
+
+
+gdp_pop<- gdp_pop %>% group_by(variable,Scenario)%>% mutate(min=min(value), q10=quantile(na.rm=T,x=value,0.1), q25=quantile(na.rm=T,x=value,0.25), med=median(value), q75=quantile(na.rm=T,x=value,0.75), q90=quantile(na.rm=T,x=value,0.9), max=max(value))
+
+
+#gdp_cap
+gdp_pop_working <- filter(gdp_pop,variable == "gdp_cap")
+test<-
+  ggplot(gdp_pop_working,aes(year,value,colour=Region))+
+  geom_line()+
+  scale_color_grey()+
+      theme_few()+
+    theme(legend.position="none")+
+  facet_grid(~Scenario)
+print(test)
+ggsave(filename = "gdp_cap.png",width = 15, height = 7, dpi = 500)
+
+
+gdp_pop_working <- filter(gdp_pop,variable == "gdp_million")
+test<-
+  ggplot(gdp_pop_working,aes(year,value,colour=Region))+
+  geom_line()+
+  scale_color_grey()+
+      theme_few()+
+    theme(legend.position="none")+
+  facet_grid(~Scenario)
+print(test)
+ggsave(filename = "gdp_million.png",width = 15, height = 7, dpi = 500)
+
+
+gdp_pop_working <- filter(gdp_pop,variable == "pop_million")
+test<-
+  ggplot(gdp_pop_working,aes(year,value,colour=Region))+
+  geom_line()+
+  scale_color_grey()+
+      theme_few()+
+    theme(legend.position="none")+
+  facet_grid(~Scenario)
+print(test)
+ggsave(filename = "pop_million.png",width = 15, height = 7, dpi = 500)
+
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Supplementary information Figure 2
+dem_h = fread(file.path(data_folder,"/plotting/democracy_historic_o.csv"), sep=",", header = T)
+#get only data we need
+iso_adj = fread(file.path(data_folder,"/plotting/iso_we_need.csv"), sep=",", header = T)
+dem_h<- merge(iso_adj,dem_h, by = c("iso3_o"),all.x = TRUE)
+#gdp_cap
+test<-
+  ggplot(dem_h,aes(year,democracy_o,colour=iso3_o))+
+  geom_line(colour="black")+
+      theme_few()+
+    theme(legend.position="none")+
+  facet_wrap(~iso3_o)+
+    theme(strip.text.x = element_text(size = 8, colour = "black"))
+print(test)
+ggsave(filename = "democracy.png",width = 15, height = 25, dpi = 500)
+
+
+```
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Supplementary information Figure 3
+dem = fread(file.path(data_folder,"/plotting/democracy_future.csv"), sep=";", header = T)
+dem=melt(dem,id.vars = c("Region"))
+setnames(dem, old = "variable", new = "year")
+setnames(dem, old = "value", new = "dem")
+dem$year = as.numeric(as.character(dem$year))
+#get only data we need
+iso_adj = fread(file.path(data_folder,"/plotting/iso_we_need.csv"), sep=",", header = T)
+setnames(iso_adj, old = "iso3_o", new = "Region")
+dem<- merge(iso_adj,dem, by = c("Region"),all.x = TRUE)
+#gdp_cap
+test<-
+  ggplot(dem,aes(year,dem,colour=Region))+
+  geom_line(colour="black")+
+      theme_few()+
+    theme(legend.position="none")+
+  facet_wrap(~Region)+
+    theme(strip.text.x = element_text(size = 8, colour = "black"))
+print(test)
+ggsave(filename = "democracy_future.png",width = 15, height = 25, dpi = 500)
+
+
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Figure 2
+dat.in <- readRDS(data_folder,"/plotting/V-Dem-CY-Full+Others-v12.rds")
+dat.in<-dat.in[,c("country_text_id","year","v2x_regime")]
+dat.in <- filter(dat.in,year == "2020")
+data("World")
+dat.in = merge(x = World, y = dat.in, by.x = 'iso_a3', by.y = 'country_text_id', all.x=TRUE, no.dups = F)
+png("regimes.png", width = 15, height = 7, units = 'in', res = 500)
+tm_shape(dat.in, projection = "+proj=wintri") + 
+  tm_borders() + 
+  tm_polygons(col="v2x_regime", style="cont", palette = "RdBu")
+dev.off()
+
+```
+
+
+```{r, echo=FALSE, message=FALSE, warning=FALSE}
+#Supplementary Information Figure 4 and 5
+dat.in_2 = fread(file.path(data_folder,"/baci/BACI_HS92_Y2020_V202201.csv"), sep=",", header = T)
+dat.in_2<-dat.in_2[,c("k","v")]
+dat.in = fread(file.path(data_folder,"/plotting/BACI_details_adj.csv"), sep=";", header = T)
+dat.in<- merge(dat.in,dat.in_2, by = c("k"),all.x = TRUE,allow.cartesian=TRUE)
+dat.in$description <- gsub( " .*$", "", dat.in$description )
+dat.in$description <-gsub(':','', dat.in$description , fixed =TRUE) 
+dat.in$description <-gsub(',','', dat.in$description , fixed =TRUE) 
+dat.in <- dat.in %>% group_by(description,category)
+dat.in = summarise(dat.in, global_value = sum(v))
+#total data
+dat.in_total <-  dat.in
+dat.in_total <- filter(dat.in_total, category != "refrigerated cargo")
+dat.in_total <-na.omit(dat.in_total)
+dat.in_total <- dat.in_total %>% group_by(category)
+dat.in_total = summarise(dat.in_total, total = sum(global_value))
+pdf(file = "total.pdf")
+pie(dat.in_total$total , labels = dat.in_total$category, main="",col=terrain.colors(length(dat.in_total$category)))
+dev.off()
+file.show("total.pdf")
+#bulk dry	
+#chemical	
+#container	
+#liquefied gas
+#oil	
+#refrigerated cargo
+#ro-ro	
+
+dat.in_working <- filter(dat.in, category == "container" )
+# treemap
+pdf(file = "container.pdf")
+treemap(dat.in_working,
+        index="description",
+        vSize="global_value",
+        type="index",
+        palette="Pastel2" 
+)
+dev.off()
+file.show("container.pdf")
+
+
+
+dat.in_working <- filter(dat.in, category == "chemical" )
+# treemap
+pdf(file = "chemical.pdf")
+treemap(dat.in_working,
+        index="description",
+        vSize="global_value",
+        type="index",
+        palette="Pastel2" 
+)
+dev.off()
+file.show("chemical.pdf")
+
+
+dat.in_working <- filter(dat.in, category == "bulk dry" )
+# treemap
+pdf(file = "bulk dry.pdf")
+treemap(dat.in_working,
+        index="description",
+        vSize="global_value",
+        type="index",
+        palette="Pastel2" 
+)
+dev.off()
+file.show("bulk dry.pdf")
+
+
+dat.in_working <- filter(dat.in, category == "liquefied gas" )
+# treemap
+pdf(file = "liquefied gas.pdf")
+treemap(dat.in_working,
+        index="description",
+        vSize="global_value",
+        type="index",
+        palette="Pastel2" 
+)
+dev.off()
+file.show("liquefied gas.pdf")
+dat.in_working <- filter(dat.in, category == "oil" )
+# treemap
+pdf(file = "oil.pdf")
+treemap(dat.in_working,
+        index="description",
+        vSize="global_value",
+        type="index",
+        palette="Pastel2" 
+)
+dev.off()
+file.show("oil.pdf")
+
+dat.in_working <- filter(dat.in, category == "ro-ro" )
+# treemap
+pdf(file = "ro-ro.pdf")
+treemap(dat.in_working,
+        index="description",
+        vSize="global_value",
+        type="index",
+        palette="Pastel2" 
+)
+dev.off()
+file.show("ro-ro.pdf")
+
+```
+
