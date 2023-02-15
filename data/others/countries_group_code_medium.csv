@@ -1,0 +1,61 @@
+﻿iso_code_alpha,iso_code_alpha_o,iso_code_alpha_d,countries_name,countries_ais,countries_port_call,iso_code,iso_code_uncom_o,iso_code_uncom_d,iiasa11
+CHN,CHN,CHN,China,China,China,156,156,156,CPA
+USA,USA,USA,United States of America,US of America,United States of America,840,842,842,NAM
+IND,IND,IND,India,India,India,356,699,699,SAS
+JPN,JPN,JPN,Japan,Japan,Japan,392,392,392,PAO
+DEU,DEU,DEU,Germany,Germany,Germany,276,276,276,WEU
+RUS,RUS,RUS,Russian Federation,Russian Federation,Russia,643,643,643,FSU
+GBR,GBR,GBR,United Kingdom,United Kingdom,United Kingdom,826,826,826,WEU
+BRA,BRA,BRA,Brazil,Brazil,Brazil,76,76,76,LAM
+FRA,FRA,FRA,France,France,France,250,251,251,WEU
+ITA,ITA,ITA,Italy,Italy,Italy,380,381,381,WEU
+MEX,MEX,MEX,Mexico,Mexico,Mexico,484,484,484,LAM
+ESP,ESP,ESP,Spain,Spain,Spain,724,724,724,WEU
+IDN,IDN,IDN,Indonesia,Indonesia,Indonesia,360,360,360,SAS
+CAN,CAN,CAN,Canada,Canada,Canada,124,124,124,NAM
+KOR,KOR,KOR,South Korea,South Korea,South Korea,410,410,410,SAS
+AUS,AUS,AUS,Australia,Australia,Australia,36,36,36,PAO
+IRN,IRN,IRN,Iran (Islamic Republic of),Iran (Islamic Republic of),Iran,364,364,364,MEA
+TUR,TUR,TUR,Türkiye,Türkiye,Turkey,792,792,792,WEU
+POL,POL,POL,Poland,Poland,Poland,616,616,616,WEU
+NLD,NLD,NLD,Netherlands,Netherlands,Netherlands,528,528,528,WEU
+SAU,SAU,SAU,Saudi Arabia,Saudi Arabia,Saudi Arabia,682,682,682,MEA
+THA,THA,THA,Thailand,Thailand,Thailand,764,764,764,SAS
+ARG,ARG,ARG,Argentina,Argentina,Argentina,32,32,32,LAM
+EGY,EGY,EGY,Egypt,Egypt,Egypt,818,818,818,MEA
+PAK,PAK,PAK,Pakistan,Pakistan,Pakistan,586,586,586,MEA
+NGA,NGA,NGA,Nigeria,Nigeria,Nigeria,566,566,566,AFR
+ZAF,ZAF,ZAF,South Africa,South Africa,South Africa,710,710,710,AFR
+COL,COL,COL,Colombia,Colombia,Colombia,170,170,170,LAM
+BEL,BEL,BEL,Belgium,Belgium,Belgium,56,56,56,WEU
+VNM,VNM,VNM,Viet Nam,Viet Nam,Viet Nam,704,704,704,SAS
+UKR,UKR,UKR,Ukraine,Ukraine,Ukraine,804,804,804,FSU
+SWE,SWE,SWE,Sweden,Sweden,Sweden,752,752,752,WEU
+MYS,MYS,MYS,Malaysia,Malaysia,Malaysia,458,458,458,SAS
+GRC,GRC,GRC,Greece,Greece,Greece,300,300,300,WEU
+VEN,VEN,VEN,Venezuela (Bolivarian Republic of),Venezuela (Bolivarian Republic of),Venezuela,862,862,862,LAM
+PHL,PHL,PHL,Philippines,Philippines,Philippines,608,608,608,SAS
+AUT,AUT,AUT,Austria,Austria,Austria,40,40,40,WEU
+CHE,CHE,CHE,Switzerland,Switzerland,Switzerland,756,757,757,WEU
+SGP,SGP,SGP,Singapore,Singapore,Singapore,702,702,702,PAO
+PER,PER,PER,Peru,Peru,Peru,604,604,604,LAM
+NOR,NOR,NOR,Norway,Norway,Norway,578,579,579,WEU
+CZE,CZE,CZE,Czechia,Czechia,Czechia,203,203,203,WEU
+BGD,BGD,BGD,Bangladesh,Bangladesh,Bangladesh,50,50,50,SAS
+DZA,DZA,DZA,Algeria,Algeria,Algeria,12,12,12,MEA
+CHL,CHL,CHL,Chile,Chile,Chile,152,152,152,LAM
+IRQ,IRQ,IRQ,Iraq,Iraq,Iraq,368,368,368,MEA
+PRT,PRT,PRT,Portugal,Portugal,Portugal,620,620,620,WEU
+ISR,ISR,ISR,Israel,Israel,Israel,376,376,376,WEU
+DNK,DNK,DNK,Denmark,Denmark,Denmark,208,208,208,WEU
+FIN,FIN,FIN,Finland,Finland,Finland,246,246,246,WEU
+IRL,IRL,IRL,Ireland,Ireland,Ireland,372,372,372,WEU
+CUB,CUB,CUB,Cuba,Cuba,Cuba,192,192,192,LAM
+NZL,NZL,NZL,New Zealand,New Zealand,New Zealand,554,554,554,PAO
+SDN,SDN,SDN,Sudan,Sudan,Sudan,729,729,729,MEA
+SVK,SVK,SVK,Slovakia,Slovakia,Slovakia,703,703,703,MEA
+LBY,LBY,LBY,Libya,Libya,Libya,434,434,434,MEA
+MAR,MAR,MAR,Morocco,Morocco,Morocco,504,504,504,MEA
+DOM,DOM,DOM,Dominican Republic,Dominican Republic,Dominican Republic,214,214,214,LAM
+GTM,GTM,GTM,Guatemala,Guatemala,Guatemala,320,320,320,LAM
+ECU,ECU,ECU,Ecuador,Ecuador,Ecuador,218,218,218,LAM
